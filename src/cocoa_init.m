@@ -23,10 +23,11 @@
 //    distribution.
 //
 //========================================================================
-// It is fine to use C99 in this file because it will not be built with VS
-//========================================================================
 
 #include "internal.h"
+
+#if defined(_GLFW_COCOA)
+
 #include <sys/param.h> // For MAXPATHLEN
 
 // Needed for _NSGetProgname
@@ -460,18 +461,26 @@ void* _glfwLoadLocalVulkanLoaderCocoa(void)
     if (!bundle)
         return NULL;
 
-    CFURLRef url =
-        CFBundleCopyAuxiliaryExecutableURL(bundle, CFSTR("libvulkan.1.dylib"));
-    if (!url)
+    CFURLRef frameworksUrl = CFBundleCopyPrivateFrameworksURL(bundle);
+    if (!frameworksUrl)
         return NULL;
+
+    CFURLRef loaderUrl = CFURLCreateCopyAppendingPathComponent(
+        kCFAllocatorDefault, frameworksUrl, CFSTR("libvulkan.1.dylib"), false);
+    if (!loaderUrl)
+    {
+        CFRelease(frameworksUrl);
+        return NULL;
+    }
 
     char path[PATH_MAX];
     void* handle = NULL;
 
-    if (CFURLGetFileSystemRepresentation(url, true, (UInt8*) path, sizeof(path) - 1))
+    if (CFURLGetFileSystemRepresentation(loaderUrl, true, (UInt8*) path, sizeof(path) - 1))
         handle = _glfwPlatformLoadModule(path);
 
-    CFRelease(url);
+    CFRelease(loaderUrl);
+    CFRelease(frameworksUrl);
     return handle;
 }
 
@@ -484,6 +493,7 @@ GLFWbool _glfwConnectCocoa(int platformID, _GLFWplatform* platform)
 {
     const _GLFWplatform cocoa =
     {
+<<<<<<< HEAD
         GLFW_PLATFORM_COCOA,
         _glfwInitCocoa,
         _glfwTerminateCocoa,
@@ -560,6 +570,80 @@ GLFWbool _glfwConnectCocoa(int platformID, _GLFWplatform* platform)
         _glfwGetRequiredInstanceExtensionsCocoa,
         _glfwGetPhysicalDevicePresentationSupportCocoa,
         _glfwCreateWindowSurfaceCocoa,
+=======
+        .platformID = GLFW_PLATFORM_COCOA,
+        .init = _glfwInitCocoa,
+        .terminate = _glfwTerminateCocoa,
+        .getCursorPos = _glfwGetCursorPosCocoa,
+        .setCursorPos = _glfwSetCursorPosCocoa,
+        .setCursorMode = _glfwSetCursorModeCocoa,
+        .setRawMouseMotion = _glfwSetRawMouseMotionCocoa,
+        .rawMouseMotionSupported = _glfwRawMouseMotionSupportedCocoa,
+        .createCursor = _glfwCreateCursorCocoa,
+        .createStandardCursor = _glfwCreateStandardCursorCocoa,
+        .destroyCursor = _glfwDestroyCursorCocoa,
+        .setCursor = _glfwSetCursorCocoa,
+        .getScancodeName = _glfwGetScancodeNameCocoa,
+        .getKeyScancode = _glfwGetKeyScancodeCocoa,
+        .setClipboardString = _glfwSetClipboardStringCocoa,
+        .getClipboardString = _glfwGetClipboardStringCocoa,
+        .initJoysticks = _glfwInitJoysticksCocoa,
+        .terminateJoysticks = _glfwTerminateJoysticksCocoa,
+        .pollJoystick = _glfwPollJoystickCocoa,
+        .getMappingName = _glfwGetMappingNameCocoa,
+        .updateGamepadGUID = _glfwUpdateGamepadGUIDCocoa,
+        .freeMonitor = _glfwFreeMonitorCocoa,
+        .getMonitorPos = _glfwGetMonitorPosCocoa,
+        .getMonitorContentScale = _glfwGetMonitorContentScaleCocoa,
+        .getMonitorWorkarea = _glfwGetMonitorWorkareaCocoa,
+        .getVideoModes = _glfwGetVideoModesCocoa,
+        .getVideoMode = _glfwGetVideoModeCocoa,
+        .getGammaRamp = _glfwGetGammaRampCocoa,
+        .setGammaRamp = _glfwSetGammaRampCocoa,
+        .createWindow = _glfwCreateWindowCocoa,
+        .destroyWindow = _glfwDestroyWindowCocoa,
+        .setWindowTitle = _glfwSetWindowTitleCocoa,
+        .setWindowIcon = _glfwSetWindowIconCocoa,
+        .getWindowPos = _glfwGetWindowPosCocoa,
+        .setWindowPos = _glfwSetWindowPosCocoa,
+        .getWindowSize = _glfwGetWindowSizeCocoa,
+        .setWindowSize = _glfwSetWindowSizeCocoa,
+        .setWindowSizeLimits = _glfwSetWindowSizeLimitsCocoa,
+        .setWindowAspectRatio = _glfwSetWindowAspectRatioCocoa,
+        .getFramebufferSize = _glfwGetFramebufferSizeCocoa,
+        .getWindowFrameSize = _glfwGetWindowFrameSizeCocoa,
+        .getWindowContentScale = _glfwGetWindowContentScaleCocoa,
+        .iconifyWindow = _glfwIconifyWindowCocoa,
+        .restoreWindow = _glfwRestoreWindowCocoa,
+        .maximizeWindow = _glfwMaximizeWindowCocoa,
+        .showWindow = _glfwShowWindowCocoa,
+        .hideWindow = _glfwHideWindowCocoa,
+        .requestWindowAttention = _glfwRequestWindowAttentionCocoa,
+        .focusWindow = _glfwFocusWindowCocoa,
+        .setWindowMonitor = _glfwSetWindowMonitorCocoa,
+        .windowFocused = _glfwWindowFocusedCocoa,
+        .windowIconified = _glfwWindowIconifiedCocoa,
+        .windowVisible = _glfwWindowVisibleCocoa,
+        .windowMaximized = _glfwWindowMaximizedCocoa,
+        .windowHovered = _glfwWindowHoveredCocoa,
+        .framebufferTransparent = _glfwFramebufferTransparentCocoa,
+        .getWindowOpacity = _glfwGetWindowOpacityCocoa,
+        .setWindowResizable = _glfwSetWindowResizableCocoa,
+        .setWindowDecorated = _glfwSetWindowDecoratedCocoa,
+        .setWindowFloating = _glfwSetWindowFloatingCocoa,
+        .setWindowOpacity = _glfwSetWindowOpacityCocoa,
+        .setWindowMousePassthrough = _glfwSetWindowMousePassthroughCocoa,
+        .pollEvents = _glfwPollEventsCocoa,
+        .waitEvents = _glfwWaitEventsCocoa,
+        .waitEventsTimeout = _glfwWaitEventsTimeoutCocoa,
+        .postEmptyEvent = _glfwPostEmptyEventCocoa,
+        .getEGLPlatform = _glfwGetEGLPlatformCocoa,
+        .getEGLNativeDisplay = _glfwGetEGLNativeDisplayCocoa,
+        .getEGLNativeWindow = _glfwGetEGLNativeWindowCocoa,
+        .getRequiredInstanceExtensions = _glfwGetRequiredInstanceExtensionsCocoa,
+        .getPhysicalDevicePresentationSupport = _glfwGetPhysicalDevicePresentationSupportCocoa,
+        .createWindowSurface = _glfwCreateWindowSurfaceCocoa
+>>>>>>> 00e86d4b733103a23278fe53ce58a0d14dd47d32
     };
 
     *platform = cocoa;
@@ -680,7 +764,11 @@ void _glfwTerminateCocoa(void)
     _glfw_free(_glfw.ns.clipboardString);
 
     _glfwTerminateNSGL();
+    _glfwTerminateEGL();
+    _glfwTerminateOSMesa();
 
     } // autoreleasepool
 }
+
+#endif // _GLFW_COCOA
 

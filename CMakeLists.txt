@@ -2,12 +2,6 @@ cmake_minimum_required(VERSION 3.4...3.20 FATAL_ERROR)
 
 project(GLFW VERSION 3.4.0 LANGUAGES C)
 
-set(CMAKE_LEGACY_CYGWIN_WIN32 OFF)
-
-if (POLICY CMP0054)
-    cmake_policy(SET CMP0054 NEW)
-endif()
-
 if (POLICY CMP0069)
     cmake_policy(SET CMP0069 NEW)
 endif()
@@ -18,9 +12,7 @@ endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    set(GLFW_STANDALONE TRUE)
-endif()
+string(COMPARE EQUAL "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}" GLFW_STANDALONE)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" ${GLFW_STANDALONE})
@@ -35,11 +27,15 @@ if (GLFW_USE_OSMESA)
     message(FATAL_ERROR "GLFW_USE_OSMESA has been removed; set the GLFW_PLATFORM init hint")
 endif()
 
+if (DEFINED GLFW_USE_WAYLAND AND UNIX AND NOT APPLE)
+    message(FATAL_ERROR
+        "GLFW_USE_WAYLAND has been removed; set the GLFW_BUILD_WAYLAND and GLFW_BUILD_X11 options")
+endif()
+
 cmake_dependent_option(GLFW_BUILD_WIN32 "Build support for Win32" ON "WIN32" OFF)
 cmake_dependent_option(GLFW_BUILD_COCOA "Build support for Cocoa" ON "APPLE" OFF)
 cmake_dependent_option(GLFW_BUILD_X11 "Build support for X11" ON "UNIX;NOT APPLE" OFF)
-cmake_dependent_option(GLFW_BUILD_WAYLAND "Build support for Wayland"
-    "${GLFW_USE_WAYLAND}" "UNIX;NOT APPLE" OFF)
+cmake_dependent_option(GLFW_BUILD_WAYLAND "Build support for Wayland" ON "UNIX;NOT APPLE" OFF)
 
 cmake_dependent_option(GLFW_USE_HYBRID_HPG "Force use of high-performance GPU on hybrid systems" OFF
                        "WIN32" OFF)

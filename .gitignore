@@ -1,5 +1,13 @@
+<<<<<<< HEAD
 # External junk
 .DS_Store
+=======
+# The canonical out-of-tree build subdirectory
+build
+build-*
+
+# Visual Studio clutter
+>>>>>>> 00e86d4b733103a23278fe53ce58a0d14dd47d32
 _ReSharper*
 *.opensdf
 *.sdf
