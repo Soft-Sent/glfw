@@ -554,6 +554,79 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
     switch (uMsg)
     {
+        // Added for Cristal Engine
+    case WM_NCCALCSIZE:
+    {
+        // Remove the window's standard sizing border
+        if (wParam == TRUE && lParam != NULL)
+        {
+            NCCALCSIZE_PARAMS* pParams = (NCCALCSIZE_PARAMS*)(lParam);
+
+            const int resizeBorderX = GetSystemMetrics(SM_CXFRAME);
+            const int resizeBorderY = GetSystemMetrics(SM_CYFRAME);
+
+            pParams->rgrc[0].right -= resizeBorderX;
+            pParams->rgrc[0].left += resizeBorderX;
+            pParams->rgrc[0].bottom -= resizeBorderY;
+            pParams->rgrc[0].top += 0;
+        }
+        return WVR_ALIGNTOP | WVR_ALIGNLEFT;
+    }
+    // Added for Cristal Engine
+    //case WM_NCPAINT:
+    //{
+    //    // Prevent the non-client area from being painted
+    //    return 0;
+    //}
+    
+    /// Added for Cristal Engine
+    /// If something works weird, change some of these params
+    case WM_NCHITTEST:
+    {
+        // Expand the hit test area for resizing
+        const int borderWidth = 2; // Adjust this value to control the hit test area size
+
+        POINTS mousePos = MAKEPOINTS(lParam);
+        POINT clientMousePos = { mousePos.x, mousePos.y };
+        ScreenToClient(hWnd, &clientMousePos);
+
+        RECT windowRect;
+        GetClientRect(hWnd, &windowRect);
+
+        if (clientMousePos.y >= windowRect.bottom - borderWidth)
+        {
+            if (clientMousePos.x <= borderWidth)
+                return HTBOTTOMLEFT;
+            else if (clientMousePos.x >= windowRect.right - borderWidth)
+                return HTBOTTOMRIGHT;
+            else
+                return HTBOTTOM;
+        }
+        else if (clientMousePos.y <= borderWidth)
+        {
+            if (clientMousePos.x <= borderWidth)
+                return HTTOPLEFT;
+            else if (clientMousePos.x >= windowRect.right - borderWidth)
+                return HTTOPRIGHT;
+            else
+                return HTTOP;
+        }
+        else if (clientMousePos.x <= borderWidth)
+        {
+            return HTLEFT;
+        }
+        else if (clientMousePos.x >= windowRect.right - borderWidth)
+        {
+            return HTRIGHT;
+        }
+
+        int titlebarHittest = 0;
+        _glfwInputTitleBarHitTest(window, clientMousePos.x, clientMousePos.y, &titlebarHittest);
+        if (titlebarHittest)
+            return HTCAPTION;
+
+        return HTCLIENT;
+    }
     case WM_MOUSEACTIVATE:
     {
         // HACK: Postpone cursor disabling when the window was activated by
@@ -1151,7 +1224,7 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
     }
 
     case WM_NCACTIVATE:
-    case WM_NCPAINT:
+    //case WM_NCPAINT:
     {
         // Prevent title bar from being drawn after restoring a minimized
         // undecorated window
