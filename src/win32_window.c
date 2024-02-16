@@ -552,8 +552,40 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
         return DefWindowProcW(hWnd, uMsg, wParam, lParam);
     }
 
+    BOOL hasThickFrame = GetWindowLongPtr(hWnd, GWL_STYLE) & WS_THICKFRAME;
     switch (uMsg)
     {
+        // Added for Cristal Engine (maybe remove)
+    case WM_CREATE:
+    {
+        if (_glfw.hints.window.titlebar)
+            break;
+
+        if (hasThickFrame)
+        {
+            RECT size_rect;
+            GetWindowRect(hWnd, &size_rect);
+
+            // Inform the application of the frame change to force redrawing with the new
+            // client area that is extended into the title bar
+            SetWindowPos(
+                hWnd, NULL,
+                size_rect.left, size_rect.top,
+                size_rect.right - size_rect.left, size_rect.bottom - size_rect.top,
+                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE
+            );
+            break;
+        }
+
+        break;
+    }
+        // Added for Cristal Engine (maybe remove)
+    case WM_ACTIVATE:
+    {
+        RECT title_bar_rect = { 0 };
+        InvalidateRect(hWnd, &title_bar_rect, FALSE);
+        break;
+    }
         // Added for Cristal Engine
     case WM_NCCALCSIZE:
     {
@@ -572,52 +604,51 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
         }
         return WVR_ALIGNTOP | WVR_ALIGNLEFT;
     }
-    // Added for Cristal Engine
-    //case WM_NCPAINT:
-    //{
-    //    // Prevent the non-client area from being painted
-    //    return 0;
-    //}
     
     /// Added for Cristal Engine
     /// If something works weird, change some of these params
     case WM_NCHITTEST:
     {
         // Expand the hit test area for resizing
-        const int borderWidth = 2; // Adjust this value to control the hit test area size
+        const int borderWidthX = 0; // Adjust this value to control the hit test area size
+        const int borderWidthY = 3; // Adjust this value to control the hit test area size
 
         POINTS mousePos = MAKEPOINTS(lParam);
         POINT clientMousePos = { mousePos.x, mousePos.y };
         ScreenToClient(hWnd, &clientMousePos);
 
-        RECT windowRect;
-        GetClientRect(hWnd, &windowRect);
+        // Check borders first
+        if (!window->win32.maximized)
+        {
+            RECT windowRect;
+            GetClientRect(hWnd, &windowRect);
 
-        if (clientMousePos.y >= windowRect.bottom - borderWidth)
-        {
-            if (clientMousePos.x <= borderWidth)
-                return HTBOTTOMLEFT;
-            else if (clientMousePos.x >= windowRect.right - borderWidth)
-                return HTBOTTOMRIGHT;
-            else
-                return HTBOTTOM;
-        }
-        else if (clientMousePos.y <= borderWidth)
-        {
-            if (clientMousePos.x <= borderWidth)
-                return HTTOPLEFT;
-            else if (clientMousePos.x >= windowRect.right - borderWidth)
-                return HTTOPRIGHT;
-            else
-                return HTTOP;
-        }
-        else if (clientMousePos.x <= borderWidth)
-        {
-            return HTLEFT;
-        }
-        else if (clientMousePos.x >= windowRect.right - borderWidth)
-        {
-            return HTRIGHT;
+            if (clientMousePos.y >= windowRect.bottom - borderWidthY)
+            {
+                if (clientMousePos.x <= borderWidthX)
+                    return HTBOTTOMLEFT;
+                else if (clientMousePos.x >= windowRect.right - borderWidthX)
+                    return HTBOTTOMRIGHT;
+                else
+                    return HTBOTTOM;
+            }
+            else if (clientMousePos.y <= borderWidthY)
+            {
+                if (clientMousePos.x <= borderWidthX)
+                    return HTTOPLEFT;
+                else if (clientMousePos.x >= windowRect.right - borderWidthX)
+                    return HTTOPRIGHT;
+                else
+                    return HTTOP;
+            }
+            else if (clientMousePos.x <= borderWidthX)
+            {
+                return HTLEFT;
+            }
+            else if (clientMousePos.x >= windowRect.right - borderWidthX)
+            {
+                return HTRIGHT;
+            }
         }
 
         int titlebarHittest = 0;
@@ -1133,6 +1164,19 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
         window->win32.iconified = iconified;
         window->win32.maximized = maximized;
+
+        RECT size_rect;
+        GetWindowRect(hWnd, &size_rect);
+
+        // Inform the application of the frame change to force redrawing with the new
+        // client area that is extended into the title bar
+        SetWindowPos(
+            hWnd, NULL,
+            size_rect.left, size_rect.top,
+            size_rect.right - size_rect.left, size_rect.bottom - size_rect.top,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE
+        );
+
         return 0;
     }
 
@@ -1224,7 +1268,7 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
     }
 
     case WM_NCACTIVATE:
-    //case WM_NCPAINT:
+    case WM_NCPAINT:
     {
         // Prevent title bar from being drawn after restoring a minimized
         // undecorated window
