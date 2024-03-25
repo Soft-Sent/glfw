@@ -53,7 +53,6 @@ project "glfw"
     
         defines {
             "_GLFW_X11"
-            
         }
 
     filter "system:macosx"
