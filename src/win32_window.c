@@ -477,7 +477,6 @@ static void releaseMonitor(_GLFWwindow* window)
 }
 
 // Manually maximize the window, for when SW_MAXIMIZE cannot be used
-//
 static void maximizeWindowManually(_GLFWwindow* window)
 {
     RECT rect;
@@ -600,7 +599,7 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             pParams->rgrc[0].right -= resizeBorderX;
             pParams->rgrc[0].left += resizeBorderX;
             pParams->rgrc[0].bottom -= resizeBorderY;
-            pParams->rgrc[0].top += 0;
+            pParams->rgrc[0].top += 1;
         }
         return WVR_ALIGNTOP | WVR_ALIGNLEFT;
     }
