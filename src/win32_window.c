@@ -608,7 +608,7 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
     }
     
     /// Added for Cristal Engine
-    /// If something works weird, change some of these params
+    /// If sometimes works weird, change some of these params later maybe
     case WM_NCHITTEST:
     {
         // Expand the hit test area for resizing
@@ -961,7 +961,7 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
     case WM_MOUSEMOVE:
     {
-        const int x = GET_X_LPARAM(lParam);
+        /*const int x = GET_X_LPARAM(lParam);
         const int y = GET_Y_LPARAM(lParam);
 
         if (!window->win32.cursorTracked)
@@ -1048,10 +1048,21 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
         window->win32.lastCursorPosY = y;
 
         return 0;
+        */
+        if (_glfw.win32.capturedCursorWindow == window)
+            captureCursor(window);
+
+        // NOTE: This cannot use LOWORD/HIWORD recommended by MSDN, as
+        // those macros do not handle negative window positions correctly
+        _glfwInputWindowPos(window,
+            GET_X_LPARAM(lParam),
+            GET_Y_LPARAM(lParam));
+        return 0;
     }
 
     case WM_INPUT:
     {
+        /*
         UINT size = 0;
         HRAWINPUT ri = (HRAWINPUT)lParam;
         RAWINPUT* data = NULL;
@@ -1107,6 +1118,74 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
                 dx = data->data.mouse.lLastX - window->win32.lastCursorPosX;
                 dy = data->data.mouse.lLastY - window->win32.lastCursorPosY;
             }
+        }
+        else
+        {
+            dx = data->data.mouse.lLastX;
+            dy = data->data.mouse.lLastY;
+        }
+
+        _glfwInputCursorPos(window,
+            window->virtualCursorPosX + dx,
+            window->virtualCursorPosY + dy);
+
+        window->win32.lastCursorPosX += dx;
+        window->win32.lastCursorPosY += dy;
+        break;
+        */
+        UINT size = 0;
+        HRAWINPUT ri = (HRAWINPUT)lParam;
+        RAWINPUT* data = NULL;
+        int dx, dy;
+
+        if (_glfw.win32.disabledCursorWindow != window)
+            break;
+        if (!window->rawMouseMotion)
+            break;
+
+        GetRawInputData(ri, RID_INPUT, NULL, &size, sizeof(RAWINPUTHEADER));
+        if (size > (UINT)_glfw.win32.rawInputSize)
+        {
+            _glfw_free(_glfw.win32.rawInput);
+            _glfw.win32.rawInput = _glfw_calloc(size, 1);
+            _glfw.win32.rawInputSize = size;
+        }
+
+        size = _glfw.win32.rawInputSize;
+        if (GetRawInputData(ri, RID_INPUT,
+            _glfw.win32.rawInput, &size,
+            sizeof(RAWINPUTHEADER)) == (UINT)-1)
+        {
+            _glfwInputError(GLFW_PLATFORM_ERROR,
+                "Win32: Failed to retrieve raw input data");
+            break;
+        }
+
+        data = _glfw.win32.rawInput;
+        if (data->data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
+        {
+            POINT pos = { 0 };
+            int width, height;
+
+            if (data->data.mouse.usFlags & MOUSE_VIRTUAL_DESKTOP)
+            {
+                pos.x += GetSystemMetrics(SM_XVIRTUALSCREEN);
+                pos.y += GetSystemMetrics(SM_YVIRTUALSCREEN);
+                width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+                height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+            }
+            else
+            {
+                width = GetSystemMetrics(SM_CXSCREEN);
+                height = GetSystemMetrics(SM_CYSCREEN);
+            }
+
+            pos.x += (int)((data->data.mouse.lLastX / 65535.f) * width);
+            pos.y += (int)((data->data.mouse.lLastY / 65535.f) * height);
+            ScreenToClient(window->win32.handle, &pos);
+
+            dx = pos.x - window->win32.lastCursorPosX;
+            dy = pos.y - window->win32.lastCursorPosY;
         }
         else
         {
@@ -2745,10 +2824,7 @@ VkResult _glfwCreateWindowSurfaceWin32(VkInstance instance,
 
 GLFWAPI HWND glfwGetWin32Window(GLFWwindow* handle)
 {
-<<<<<<< HEAD
     _GLFWwindow* window = (_GLFWwindow*)handle;
-=======
->>>>>>> upstream/master
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
 
     if (_glfw.platform.platformID != GLFW_PLATFORM_WIN32)
@@ -2758,7 +2834,6 @@ GLFWAPI HWND glfwGetWin32Window(GLFWwindow* handle)
         return NULL;
     }
 
-    _GLFWwindow* window = (_GLFWwindow*) handle;
     assert(window != NULL);
 
     return window->win32.handle;

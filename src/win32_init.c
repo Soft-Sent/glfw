@@ -698,15 +698,6 @@ int _glfwInitWin32(void)
     if (!createHelperWindow())
         return GLFW_FALSE;
 
-    //Some hacks are needed to support Remote Desktop...
-    initRemoteSession();
-    if (_glfw.win32.isRemoteSession && _glfw.win32.blankCursor == NULL)
-    {
-        _glfwInputErrorWin32(GLFW_PLATFORM_ERROR,
-            "Win32: Failed to create blank cursor for remote session.");
-        return GLFW_FALSE;
-    }
-
     _glfwPollMonitorsWin32();
     return GLFW_TRUE;
 }
