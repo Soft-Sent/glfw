@@ -1,5 +1,5 @@
 //========================================================================
-// GLFW 3.4 Win32 - www.glfw.org
+// GLFW 3.5 Win32 - www.glfw.org
 //------------------------------------------------------------------------
 // Copyright (c) 2002-2006 Marcus Geelnard
 // Copyright (c) 2006-2019 Camilla Löwy <elmindreda@glfw.org>
@@ -32,6 +32,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <windowsx.h>
 #include <shellapi.h>
 
@@ -232,10 +233,12 @@ static void updateCursorImage(_GLFWwindow* window)
             SetCursor(LoadCursorW(NULL, IDC_ARROW));
     }
     else
-        //Connected via Remote Desktop, NULL cursor will present SetCursorPos the move the cursor.
-        //using a blank cursor fix that.
-        //When not via Remote Desktop, win32.blankCursor should be NULL
+    {
+        // NOTE: Via Remote Desktop, setting the cursor to NULL does not hide it.
+        // HACK: When running locally, it is set to NULL, but when connected via Remote
+        //       Desktop, this is a transparent cursor.
         SetCursor(_glfw.win32.blankCursor);
+    }
 }
 
 // Sets the cursor clip rect to the window content area
@@ -984,6 +987,56 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             if (window->rawMouseMotion)
                 break;
 
+            GetRawInputData(ri, RID_INPUT, NULL, &size, sizeof(RAWINPUTHEADER));
+            if (size > (UINT) _glfw.win32.rawInputSize)
+            {
+                _glfw_free(_glfw.win32.rawInput);
+                _glfw.win32.rawInput = _glfw_calloc(size, 1);
+                _glfw.win32.rawInputSize = size;
+            }
+
+            size = _glfw.win32.rawInputSize;
+            if (GetRawInputData(ri, RID_INPUT,
+                                _glfw.win32.rawInput, &size,
+                                sizeof(RAWINPUTHEADER)) == (UINT) -1)
+            {
+                _glfwInputError(GLFW_PLATFORM_ERROR,
+                                "Win32: Failed to retrieve raw input data");
+                break;
+            }
+
+            data = _glfw.win32.rawInput;
+            if (data->data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
+            {
+                POINT pos = {0};
+                int width, height;
+
+                if (data->data.mouse.usFlags & MOUSE_VIRTUAL_DESKTOP)
+                {
+                    pos.x += GetSystemMetrics(SM_XVIRTUALSCREEN);
+                    pos.y += GetSystemMetrics(SM_YVIRTUALSCREEN);
+                    width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+                    height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+                }
+                else
+                {
+                    width = GetSystemMetrics(SM_CXSCREEN);
+                    height = GetSystemMetrics(SM_CYSCREEN);
+                }
+
+                pos.x += (int) ((data->data.mouse.lLastX / 65535.f) * width);
+                pos.y += (int) ((data->data.mouse.lLastY / 65535.f) * height);
+                ScreenToClient(window->win32.handle, &pos);
+
+                dx = pos.x - window->win32.lastCursorPosX;
+                dy = pos.y - window->win32.lastCursorPosY;
+            }
+            else
+            {
+                dx = data->data.mouse.lLastX;
+                dy = data->data.mouse.lLastY;
+            }
+
             _glfwInputCursorPos(window,
                 window->virtualCursorPosX + dx,
                 window->virtualCursorPosY + dy);
@@ -1430,6 +1483,34 @@ static int createNativeWindow(_GLFWwindow* window,
         }
     }
 
+    if (GetSystemMetrics(SM_REMOTESESSION))
+    {
+        // NOTE: On Remote Desktop, setting the cursor to NULL does not hide it
+        // HACK: Create a transparent cursor and always set that instead of NULL
+        //       When not on Remote Desktop, this handle is NULL and normal hiding is used
+        if (!_glfw.win32.blankCursor)
+        {
+            const int cursorWidth = GetSystemMetrics(SM_CXCURSOR);
+            const int cursorHeight = GetSystemMetrics(SM_CYCURSOR);
+
+            unsigned char* cursorPixels = _glfw_calloc(cursorWidth * cursorHeight, 4);
+            if (!cursorPixels)
+                return GLFW_FALSE;
+
+            // NOTE: Windows checks whether the image is fully transparent and if so
+            //       just ignores the alpha channel and makes the whole cursor opaque
+            // HACK: Make one pixel slightly less transparent
+            cursorPixels[3] = 1;
+
+            const GLFWimage cursorImage = { cursorWidth, cursorHeight, cursorPixels };
+            _glfw.win32.blankCursor = createIcon(&cursorImage, 0, 0, FALSE);
+            _glfw_free(cursorPixels);
+
+            if (!_glfw.win32.blankCursor)
+                return GLFW_FALSE;
+        }
+    }
+
     if (window->monitor)
     {
         MONITORINFO mi = { sizeof(mi) };
@@ -1506,6 +1587,7 @@ static int createNativeWindow(_GLFWwindow* window,
 
     window->win32.scaleToMonitor = wndconfig->scaleToMonitor;
     window->win32.keymenu = wndconfig->win32.keymenu;
+    window->win32.showDefault = wndconfig->win32.showDefault;
 
     if (!window->monitor)
     {
@@ -1888,7 +1970,23 @@ void _glfwMaximizeWindowWin32(_GLFWwindow* window)
 
 void _glfwShowWindowWin32(_GLFWwindow* window)
 {
-    ShowWindow(window->win32.handle, SW_SHOWNA);
+    int showCommand = SW_SHOWNA;
+
+    if (window->win32.showDefault)
+    {
+        // NOTE: GLFW windows currently do not seem to match the Windows 10 definition of
+        //       a main window, so even SW_SHOWDEFAULT does nothing
+        //       This definition is undocumented and can change (source: Raymond Chen)
+        // HACK: Apply the STARTUPINFO show command manually if available
+        STARTUPINFOW si = { sizeof(si) };
+        GetStartupInfoW(&si);
+        if (si.dwFlags & STARTF_USESHOWWINDOW)
+            showCommand = si.wShowWindow;
+
+        window->win32.showDefault = GLFW_FALSE;
+    }
+
+    ShowWindow(window->win32.handle, showCommand);
 }
 
 void _glfwHideWindowWin32(_GLFWwindow* window)
@@ -2647,7 +2745,10 @@ VkResult _glfwCreateWindowSurfaceWin32(VkInstance instance,
 
 GLFWAPI HWND glfwGetWin32Window(GLFWwindow* handle)
 {
+<<<<<<< HEAD
     _GLFWwindow* window = (_GLFWwindow*)handle;
+=======
+>>>>>>> upstream/master
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
 
     if (_glfw.platform.platformID != GLFW_PLATFORM_WIN32)
@@ -2656,6 +2757,9 @@ GLFWAPI HWND glfwGetWin32Window(GLFWwindow* handle)
             "Win32: Platform not initialized");
         return NULL;
     }
+
+    _GLFWwindow* window = (_GLFWwindow*) handle;
+    assert(window != NULL);
 
     return window->win32.handle;
 }
